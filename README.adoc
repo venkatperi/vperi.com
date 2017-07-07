@@ -1,0 +1,4 @@
+* Asciidoc sources for my http://www.vperi.com[blog]. 
+* Wordpress conversion and sync via https://github.com/venkatperi/wp-asciidoc[wp-asciidoc].
+
+
