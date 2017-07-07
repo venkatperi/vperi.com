@@ -1,0 +1,42 @@
+
+NOTE: This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+
+[.address]
+How fast can we push the same `String` object to a `null writer`? What is the impact of varying string length, high water mark, and object mode?
+
+[TIP]
+====
+.Reproduce This
+```javascript
+$ bench-runner -g "iter.*string"
+```
+====
+
+=== The Test
+In this test, we push `string` objects from a `memory reader` to a `null writer`, using the following settings:
+
+* `encoding`: Chunks are encoded as `string` objects.
+* `highWaterMark`:
+  ** `default`: Use the default `highWaterMark` (16KiB).
+  ** `low`: Force the `highWaterMark` to be always lower than the string length.
+  ** `high`: Force the `highWaterMark` to be always higher than the string length.
+* `string length`: From 2KiB to 512KiB in steps of powers of 2.
+
+[NOTE]
+====
+.About the Graphs
+- Performance: Higher is better.
+- Both axes are `log10`
+====
+
+//image:https://plot.ly/~venkatperi/54.png?share_key=v5tedK2yTPAGb9skUqw0JL[string]
+image:54.png[string]
+
+==== Observations
+* Pushing `string` objects incurs computational overhead due to conversion to `Buffer` objects internally. Therefore unlike the previous case, chunk size matters and performance is not constant vs string size.
+* Chunk Size vs `highWaterMark`
+ ** Performance is slightly better when `chunk size < highWaterMark` (`high` plot) for lower chunk sizes.
+ ** Likewise, performance is slightly lower when `chunk size > highWaterMark`, for lower chunk sizes.
+ ** In the case of the default `highWaterMark`, the trace follows `high` up to 16KiB after which it follows the `low` plot.
+
+* Operating the stream in object mode restores performance back to those seen with pushing `Buffer` objects since strings are no longer encoded/decoded.

@@ -1,0 +1,60 @@
+
+[NOTE]
+====
+This is part of series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+
+_To Reproduce:_
+```javascript
+$ bench-runner -g "passthrough.*false.*default.*buffer"
+```
+====
+
+[.address]
+What's the impact of adding one or more  `TransformStream` objects
+in a Node.js stream?
+
+=== The Test
+Here we look at the impact on our baseline http://vperi.com/2017/07/03/streaming-buffers[memory to null] stream.
+
+image::streams-passthrough.png[align=center]
+
+The test settings are:
+
+* `encoding`: Chunks are encoded as `Buffer` objects. As we noted http://www.vperi.com/archives/499[earlier], doing so won't incur any conversion overhead and in the absence other computational effort in the stream, performance should not change when `chunk size` is varied.
+* `chunk size`: Ranges from `2KiB` to `512KiB`, doubling at each step.
+* `highWaterMark`:
+  ** `default`: Use the default `highWaterMark` (16KiB)
+  ** `low`: Force the `highWaterMark` to be always lower than the chunk size
+  ** `high`: Force the `highWaterMark` to be always higher than the chunk size
+
+
+[NOTE]
+====
+.About the Graphs
+- `count`: The number of `PassThrough` transform streams.
+- Performance: higher is better.
+- Both axes are `log10`
+====
+
+
+==== Default High Water Mark
+
+image:62.png[default hwm]
+
+TIP: See http://vperi.com/2017/07/03/streaming-buffers/#high-water-dip[this] for a discussion on why the traces dip around 16KiB.
+
+==== High Water Mark > Chunk Size
+
+image:64.png[high hwm]
+
+==== High Water Mark < Chunk Size
+
+image:66.png[low hwm]
+
+==== In Object Mode
+
+image:68.png[object mode]
+
+==== Thoughts
+- Across the board, performance drops when more `Transform` streams are added. This isn't surprising since both `ReadableStream` and `WritableStream` use `process.nextTick` for synchronous callbacks (see http://vperi.com/2017/07/03/nexttick-setimmediate/[Performance of nextTick]).
+- Bottomline: Keep your pipeline depth small.

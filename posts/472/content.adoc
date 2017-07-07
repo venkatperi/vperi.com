@@ -1,0 +1,58 @@
+[NOTE]
+====
+This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+
+.Reproduce This
+```javascript
+$ bench-runner -g "nextTick|setImmediate"
+```
+====
+
+[.address]
+How fast would our code run if it deferred one or more times with `process.nextTick()` or `setImmediate()` (see https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick/[event loop] for background)?
+
+=== The Test
+We stack up one or more calls and time it. Simple.
+
+[source, javascript]
+----
+const fapply = ( f, n, arg ) =>
+      f( n > 1
+          ? () => fapply( f, n - 1, arg )
+          : () => arg() );
+----
+
+[NOTE]
+====
+.About the Graphs
+- Higher performance means faster allocation.
+- Both axes are `log10`
+====
+
+==== process.nextTick
+```javascript
+suite( 'nextTick', () => {
+  for ( let i = 1; i <= maxCount; i++ ) {
+    bench( i, ( cb ) =>
+      fnapply( process.nextTick, i, cb ) );
+  }
+} );
+```
+
+image:70.png[nextTick]
+
+===== setImmediate
+```javascript
+suite( 'setImmediate', () => {
+  for ( let i = 1; i <= maxCount; i++ ) {
+    bench( i, ( cb ) =>
+      fnapply( setImmediate, i, cb ) );
+  }
+} );
+```
+
+image:72.png[setImmediate]
+
+==== Thoughts
+* `process.nextTick` runs faster and it should. But we're aren't comparing.
+* Deferring is part of life in Node's cooperative world. However, if you have a deep defer stack in the middle of your job, expect a bit of a slowdown, a.k.a. increased latency.

@@ -1,0 +1,80 @@
+[NOTE]
+====
+This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+
+.To Reproduce
+```javascript
+$ bench-runner -g "iter.*buffer"
+```
+====
+
+[.address]
+How fast can we push the same `Buffer` object to a `null writer`? What is the impact of varying `chunk size`, `high water mark`, `encoding` and `object mode`?
+
+=== Memory Reader -> Null Writer
+Our _base case_ is a trivially simple pipeline consisting of a reader that pushes the same chunk of memory (a memory reader) to a writer which simply discards them (a null writer). By reusing memory, the memory reader avoids any memory
+allocation overhead.
+
+==== Memory Reader
+`MemoryReader` is a `Readable` stream which uses a
+generator/iterator to push `Buffer` objects. The
+generators returns the same memory chunk for every call to
+`next()` to avoid the overhead of allocating memory.
+
+[source,javascript]
+----
+function next( stream ) {
+  var next = stream._generator.next();
+  return stream.push( next.done ? null : next.value );
+}
+
+GeneratorReader.prototype._read = ( n ) =>  {
+  while ( next( this ) ) {}
+};
+----
+
+==== Null Writer
+`NullWriter` is a `Writable` stream which accepts chunks and does
+nothing with them.
+
+[source,javascript]
+----
+NullWriter.prototype._write = ( chunk, enc, cb )  => cb();
+----
+
+=== The Test
+A `memory reader` is configured to iteratively push a chunk of data `null writer`.
+
+image::streams-baseline.png[align=center]
+
+We use the following settings:
+
+* `encoding`: Chunks are encoded as `buffers` to avoid conversion overhead.
+* `chunk size`: Ranges from `2KiB` to `512KiB`, doubling at each step.
+* `highWaterMark`:
+  ** `default`: Use the default `highWaterMark` (`16KiB`).
+  ** `low`: `highWaterMark = chunk size / 2`, always lower than `chunk size`.
+  ** `high`: `highWaterMark = chunk size * 2`, always higher than `chunk size`.
+
+[NOTE]
+====
+.About the Graphs
+- Performance: higher is better.
+- Both axes are `log10`.
+====
+
+image:48.png[align=center]
+
+[[high-water-dip]]
+==== Observations
+* Since we're pushing `Buffer` objects, with no other significant computational activity on the data, performance is invariant of `chunk size`.
+* `Chunk Size` vs `highWaterMark`
+ ** Performance is best when `highWaterMark > chunk size` (`high` trace).
+ ** Likewise, performance is always poor when `highWaterMark < chunk size` (`low` trace), since buffers are sliced _and_ copied to match downstream `high water mark` requirements.
+ ** When `highWaterMark` is default, performance follows the `high` trace up to the default value of `16KiB`, after which is drops and follows the `low` trace.
+
+* In `object mode`, performance is invariant of `high water mark` and `chunk size`, with a marginal boost over the best `non-object mode` case. In this mode, all buffer slicing/copying is bypassed and buffers are simply queued and handed downstream.
+
+==== Thoughts
+* The relationship between `chunk size` and `high water mark` matters.
+* Since there's no parameter negotiation process nor any pipeline-wide configuration, settings must be tracked and matched per stream in the pipeline. This is particularly true in the case of operating in `object mode`.

@@ -1,0 +1,32 @@
+
+[NOTE]
+====
+This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+
+.Reproduce This
+```javascript
+$ bench-runner -g "buffer allocation"
+```
+====
+
+[.address]
+How fast can Node.js allocate a `2KiB` `Buffer`? What about a `128MiB` `Buffer`?
+
+=== The Test
+We allocate Node.js `Buffer` objects of increasing sizes from `2KiB` to `128KiB`, doubling at each step. `Buffers` are allocated via `Buffer.allocUnsafe()`.
+
+[NOTE]
+====
+.About the Graph
+- Higher performance means faster allocation.
+- Both axes are `log10`.
+====
+
+image:60.png[performance]
+
+
+==== Observations
+* Node allocates smaller `Buffers` faster, clearly. Under the hood, Node calls http://man7.org/linux/man-pages/man3/malloc.3.html[malloc(3)]. While numerous wars have been waged on the performance of `malloc()` vs alternatives, the fact remains that operating systems allocate more time to allocate larger buffers.  
+
+==== Thoughts
+* If you need large `Buffer` objects on a regular basis, you'll may hit a significant performance bottleneck if you allocate on demand and GC them when you're done. Instead, consider using a buffer pool.
