@@ -1,15 +1,10 @@
-[NOTE]
-====
-This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
-
-.Reproduce This
-```javascript
-$ bench-runner -g "nextTick|setImmediate"
-```
-====
+include::{commondir}/streams-series.adoc[]
 
 [.address]
 How fast would our code run if it deferred one or more times with `process.nextTick()` or `setImmediate()` (see https://nodejs.org/en/docs/guides/event-loop-timers-and-nexttick/[event loop] for background)?
+
+:filter: "nextTick|setImmediate"
+include::{commondir}/reproduce.adoc[]
 
 === The Test
 We stack up one or more calls and time it. Simple.

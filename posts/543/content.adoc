@@ -1,16 +1,10 @@
-
-NOTE: This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
+include::{commondir}/streams-series.adoc[]
 
 [.address]
 How fast can we push the same `String` object to a `null writer`? What is the impact of varying string length, high water mark, and object mode?
 
-[TIP]
-====
-.Reproduce This
-```javascript
-$ bench-runner -g "iter.*string"
-```
-====
+:filter: "iter.*string"
+include::{commondir}/reproduce.adoc[]
 
 === The Test
 In this test, we push `string` objects from a `memory reader` to a `null writer`, using the following settings:

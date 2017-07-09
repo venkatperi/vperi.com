@@ -1,3 +1,5 @@
+include::{commondir}/streams-series.adoc[]
+
 [.address]
 In this series of posts, we will be looking at the performance of Node.js streams. We want to see the relative speed of a stream component or a pipeline of stream nodes can run, when stream parameters `encoding`, `chunk size`, `high water mark` and `object mode` are varied. We will also look at performance under varying pipeline depth.
 
@@ -6,14 +8,6 @@ In this series of posts, we will be looking at the performance of Node.js stream
 =====
 https://github.com/venkatperi/stream-benchmarks/[Get the sources]
 =====
-
-
-=== In this Series
-* http://vperi.com/2017/07/03/node-js-buffer-allocation-performance/[Buffer Allocation Performance]
-* http://vperi.com/2017/07/03/nexttick-setimmediate/[Performance of process.nextTick & setImmediate]
-* http://vperi.com/2017/07/03/streaming-buffers/[Baseline Stream Performance with Buffers]
-* http://vperi.com/2017/07/04/with-transform-streams/[Performance with Transform Streams]
-* http://vperi.com/2017/07/04/stream-performance-strings/[Stream Performance with Strings]
 
 === Methodology
 
@@ -30,8 +24,8 @@ We use http://www.benchmarkjs.com/[benchmark.js] as a primary method for determi
 | OS | macOS Sierra 10.12.5
 |===
 
+[[reproducing]]
 === Reproducing Tests
-
 
 Install https://www.npmjs.com/package/bench-runner[bench-runner]:
 
@@ -48,7 +42,7 @@ $ git clone https://github.com/venkatperi/stream-benchmarks
 $ cd stream-benchmarks
 ----
 
-Run `bench-runner`:
+Run `bench-runner` (this will take some time):
 
 [source,bash]
-$ bench-runner
+$ bench-runner -g <see test for filter>

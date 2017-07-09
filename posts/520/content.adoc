@@ -1,17 +1,11 @@
-
-[NOTE]
-====
-This is part of series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
-
-_To Reproduce:_
-```javascript
-$ bench-runner -g "passthrough.*false.*default.*buffer"
-```
-====
+include::{commondir}/streams-series.adoc[]
 
 [.address]
 What's the impact of adding one or more  `TransformStream` objects
 in a Node.js stream?
+
+:filter: "passthrough.*false.*default.*buffer"
+include::{commondir}/reproduce.adoc[]
 
 === The Test
 Here we look at the impact on our baseline http://vperi.com/2017/07/03/streaming-buffers[memory to null] stream.

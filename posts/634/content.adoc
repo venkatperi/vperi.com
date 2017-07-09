@@ -1,0 +1,120 @@
+include::{commondir}/streams-series.adoc[]
+
+[.address]
+https://github.com/nodejs/node/blob/master/lib/fs.js[fs.ReadStream] allocates large `Buffer` objects on the fly, which can have a significant impact on https://www.vperi.com/archives/464[performance]. Instead, acquiring buffers from a pool and returning them when done can boost performance by *67%* over a wide range of file sizes.
+
+:filter: "file -> null"
+include::{commondir}/reproduce.adoc[]
+
+=== About fs.ReadStream
+`fs.ReadStream` is an internal Node.js class which is created by `fs.createReadSteam`.
+
+```javascript
+fs.createReadStream = function(path, options) {
+  return new ReadStream(path, options);
+};
+```
+
+In it's `_read()` implementation, `ReadStream` allocates `Buffer` objects on as it reads through the file. These are later discarded by the downstream `Writables` to be picked up by `GC`.
+
+._read()
+```javascript
+ReadStream.prototype._read = function(n) {
+  ...
+  if (!pool || pool.length - pool.used < kMinPoolSpace) {
+    // discard the old pool.
+    allocNewPool(this._readableState.highWaterMark);
+  }
+  ...
+```
+
+.allocNewPool()
+```javascript
+function allocNewPool(poolSize) {
+  pool = Buffer.allocUnsafe(poolSize);
+  pool.used = 0;
+}
+```
+
+=== Buffer Pool
+A buffer pool would hold multiple resources such as `Buffer` objects. Clients such as `fs.ReadStream` would borrow buffers and have them returned when no longer needed. The pool would be have a cap on the total number of resources it manages. An eviction scheme could be used to reduce allocated capacity when load is low.
+
+==== A Buffer Pool Scheme for Node Streams
+A buffer pool implementation for Node streams will need some thought since borrowing and release of `Buffer` objects occur at differing points in the stream.
+
+===== Reference Counting `Buffer` Objects
+One possibility is to maintain a reference count on `Buffer` objects created by the pool and exposing `_ref()` and `_unref()` methods on the `Buffer`. The pool calls `_ref()` before loaning out buffer objects. When the `_refCount` drops to `0`, a `release()` method is invoked to return the `Buffer` back to the pool.
+
+NOTE: `release()` is responsible for returning the buffer back to the pool.
+
+```javascript
+function monkey_patch_buffer_object( obj, release ) {
+  obj._refCount = 0;
+  obj._ref = () => obj._refCount++;
+  obj._refRelease = release ? release : () => {};
+  obj._unref = () => {
+    if ( obj._refCount > 0 ) {
+      obj._refCount--;
+      if ( obj._refCount === 0 ) {
+        obj._refRelease( obj );
+      }
+    }
+  };
+}
+```
+
+Appropriate reference counting logic is needed in `ReadStream.push` and `WriteStream.write`:
+
+===== Readable
+```javascript
+Readable.prototype.push = function ( chunk, encoding ) {
+    ...
+   if ( chunk && typeof chunk._ref === 'function' ) {
+      chunk._ref();
+    }
+    ...
+};
+```
+
+===== Writable
+```javascript
+Writable.prototype.write = function ( chunk, encoding, cb ) {
+  ...
+  if ( !(chunk && typeof chunk._unref === 'function') ) {
+    return this._unref();
+  }
+  ...
+ }
+```
+
+WARNING: `_writev()` / handling multiple buffers needs to be looked at to ensure `_unref()` is invoked correctly.
+
+=== The Test
+In this test, we simulate the use of a buffer pool but reusing a `Buffer` object over the lifetime of the read. While this will corrupt the data being read, it is a quick way establish the potential gain in performance by use of a pool.
+
+We read files of varying sizes and write them to a `null writer`. The test settings are:
+
+* `encoding`: Chunks are encoded as `Buffer` objects to avoid conversion overhead.
+* `highWaterMark`: Set to `64KiB` by `fs.ReadStream` as an internal default.
+* `file size`: Ranges from `1KiB` to `1GiB`, doubling at each step.
+
+[NOTE]
+====
+.About the Graph
+- Performance: higher is better.
+- Both axes are `log10`.
+====
+
+image::81.png[]
+
+[NOTE]
+====
+.About the Graph
+- Shows percentage boost in performance with a simulated buffer pool.
+- X axis is `log10`.
+- Y axis is linear.
+====
+image::83.png[]
+
+==== Observations
+- The simulated buffer pool boosts performance across the tested file sizes by an average of 67%.

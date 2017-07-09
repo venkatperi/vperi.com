@@ -1,15 +1,10 @@
-[NOTE]
-====
-This is part of a series on http://vperi.com/2017/07/03/node-js-streams-performance[Node.js Streams Performance].
-
-.To Reproduce
-```javascript
-$ bench-runner -g "iter.*buffer"
-```
-====
+include::{commondir}/streams-series.adoc[]
 
 [.address]
 How fast can we push the same `Buffer` object to a `null writer`? What is the impact of varying `chunk size`, `high water mark`, `encoding` and `object mode`?
+
+:filter: "iter.*buffer"
+include::{commondir}/reproduce.adoc[]
 
 === Memory Reader -> Null Writer
 Our _base case_ is a trivially simple pipeline consisting of a reader that pushes the same chunk of memory (a memory reader) to a writer which simply discards them (a null writer). By reusing memory, the memory reader avoids any memory
